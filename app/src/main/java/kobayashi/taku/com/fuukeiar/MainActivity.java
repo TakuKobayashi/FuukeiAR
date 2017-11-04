@@ -8,6 +8,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -19,6 +20,10 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 
+import com.google.android.gms.maps.OnStreetViewPanoramaReadyCallback;
+import com.google.android.gms.maps.StreetViewPanorama;
+import com.google.android.gms.maps.model.LatLng;
+
 import java.util.ArrayList;
 
 public class MainActivity extends Activity {
@@ -28,10 +33,15 @@ public class MainActivity extends Activity {
         System.loadLibrary("native-lib");
     }
 
+    private static final String STREETVIEW_BUNDLE_KEY = "StreetViewBundleKey";
+
     private static final int REQUEST_CODE_CAMERA_PERMISSION = 1;
     private CameraWrapper mCamera;
     private SurfaceHolder mHolder;
     private Handler mCallMainThreadHandler;
+
+    private ExtendStreetViewPanoramaView mStreetViewPanoramaView;
+    private StreetViewPanorama mStreetViewPanorama;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +64,26 @@ public class MainActivity extends Activity {
                 startTakePictureThread();
             }
         });
+
+        Bundle streetViewBundle = null;
+        if (savedInstanceState != null) {
+            streetViewBundle = savedInstanceState.getBundle(STREETVIEW_BUNDLE_KEY);
+        }
+        mStreetViewPanoramaView = (ExtendStreetViewPanoramaView) findViewById(R.id.street_panorama_view);
+        mStreetViewPanoramaView.onCreate(streetViewBundle);
+        mStreetViewPanoramaView.getStreetViewPanoramaAsync(new OnStreetViewPanoramaReadyCallback() {
+            @Override
+            public void onStreetViewPanoramaReady(StreetViewPanorama streetViewPanorama) {
+                Log.d("Fuukei", "ready");
+                mStreetViewPanorama = streetViewPanorama;
+                mStreetViewPanorama.setStreetNamesEnabled(true);
+                mStreetViewPanorama.setUserNavigationEnabled(true);
+                mStreetViewPanorama.setZoomGesturesEnabled(true);
+                mStreetViewPanorama.setPanningGesturesEnabled(true);
+                mStreetViewPanorama.setPosition(new LatLng(35.910108, 138.238524));
+            }
+        });
+//        mStreetViewPanoramaView.setLis
 
         Util.requestPermissions(this, REQUEST_CODE_CAMERA_PERMISSION);
     }
@@ -111,12 +141,14 @@ public class MainActivity extends Activity {
             setupMobileVisionCamera();
             startCamera(mHolder);
         }
+        mStreetViewPanoramaView.onResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopCamera();
+        mStreetViewPanoramaView.onPause();
     }
 
     private void stopCamera(){
@@ -135,6 +167,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        mStreetViewPanoramaView.onDestroy();
     }
 
     private void setupMobileVisionCamera() {
@@ -167,6 +200,19 @@ public class MainActivity extends Activity {
             holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         }
         return holder;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        Bundle mStreetViewBundle = outState.getBundle(STREETVIEW_BUNDLE_KEY);
+        if (mStreetViewBundle == null) {
+            mStreetViewBundle = new Bundle();
+            outState.putBundle(STREETVIEW_BUNDLE_KEY, mStreetViewBundle);
+        }
+
+        mStreetViewPanoramaView.onSaveInstanceState(mStreetViewBundle);
     }
 
     /**

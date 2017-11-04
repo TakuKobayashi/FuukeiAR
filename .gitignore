@@ -133,3 +133,5 @@ gradle-app.setting
 
 # build enviroment config
 gradleconfig.yml
+
+app/src/main/res/values/apikey.xml

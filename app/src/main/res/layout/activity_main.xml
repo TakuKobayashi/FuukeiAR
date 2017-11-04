@@ -8,7 +8,24 @@
     <SurfaceView
         android:id="@+id/camera_preview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_toLeftOf="@+id/center_point"
+        />
+
+    <View
+        android:id="@+id/center_point"
+        android:layout_width="1px"
+        android:layout_height="1px"
+        android:layout_centerInParent="true"
+        />
+
+    <kobayashi.taku.com.fuukeiar.ExtendStreetViewPanoramaView
+        android:id="@+id/street_panorama_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_toRightOf="@+id/center_point"
+        />
+
 
     <Button
         android:id="@+id/take_picture_button"
