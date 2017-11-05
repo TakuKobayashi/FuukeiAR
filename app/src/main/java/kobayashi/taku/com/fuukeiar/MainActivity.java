@@ -30,6 +30,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 
 import com.bumptech.glide.Glide;
 import com.google.android.gms.common.ConnectionResult;
@@ -97,7 +98,8 @@ public class MainActivity extends Activity {
 
         mHolder = generateSurfaceHolder();
 
-        Button takePictureButton = (Button) findViewById(R.id.take_picture_button);
+        ImageView takePictureButton = (ImageView) findViewById(R.id.take_picture_button);
+        takePictureButton.setImageBitmap(Util.loadImageFromAsset(this, "pct_camara.png"));
         takePictureButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -369,6 +371,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         mStreetViewPanoramaView.onDestroy();
+        Util.releaseImageView((ImageView) findViewById(R.id.take_picture_button));
     }
 
     private SurfaceHolder generateSurfaceHolder(){

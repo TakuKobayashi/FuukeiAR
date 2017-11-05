@@ -26,13 +26,19 @@
         android:layout_toRightOf="@+id/center_point"
         />
 
+    <ImageView
+        android:id="@+id/demo_overlayImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_toRightOf="@+id/center_point"
+        />
 
-    <Button
+    <ImageView
         android:id="@+id/take_picture_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true"
-        android:text="takePicture"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="10dp"
         />
 </RelativeLayout>
