@@ -2,29 +2,43 @@ package kobayashi.taku.com.fuukeiar;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
+import android.os.Looper;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
-import android.view.Surface;
+import android.util.Pair;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.RelativeLayout;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResolvableApiException;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.LocationSettingsStates;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.maps.OnStreetViewPanoramaReadyCallback;
 import com.google.android.gms.maps.StreetViewPanorama;
 import com.google.android.gms.maps.model.LatLng;
-
-import java.util.ArrayList;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 
 public class MainActivity extends Activity {
 
@@ -36,12 +50,17 @@ public class MainActivity extends Activity {
     private static final String STREETVIEW_BUNDLE_KEY = "StreetViewBundleKey";
 
     private static final int REQUEST_CODE_CAMERA_PERMISSION = 1;
+    private static final int REQUEST_CHECK_LOCATION_PERMISSION = 2;
     private CameraWrapper mCamera;
     private SurfaceHolder mHolder;
     private Handler mCallMainThreadHandler;
 
     private ExtendStreetViewPanoramaView mStreetViewPanoramaView;
     private StreetViewPanorama mStreetViewPanorama;
+
+    private GoogleApiClient mGoogleApiClient;
+    private FusedLocationProviderClient mFusedLocationClient;
+    private Pair<Double, Double> mLatLocation = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,19 +93,114 @@ public class MainActivity extends Activity {
         mStreetViewPanoramaView.getStreetViewPanoramaAsync(new OnStreetViewPanoramaReadyCallback() {
             @Override
             public void onStreetViewPanoramaReady(StreetViewPanorama streetViewPanorama) {
-                Log.d("Fuukei", "ready");
                 mStreetViewPanorama = streetViewPanorama;
                 mStreetViewPanorama.setStreetNamesEnabled(true);
                 mStreetViewPanorama.setUserNavigationEnabled(true);
                 mStreetViewPanorama.setZoomGesturesEnabled(true);
                 mStreetViewPanorama.setPanningGesturesEnabled(true);
-                mStreetViewPanorama.setPosition(new LatLng(35.910108, 138.238524));
+                if(mFusedLocationClient != null){
+                    // 最後の位置情報取得
+                    Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                    if(location != null){
+                        mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+                    }
+                }
             }
         });
-//        mStreetViewPanoramaView.setLis
+
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
+                    @Override
+                    public void onConnected(@Nullable Bundle bundle) {
+                        Log.d(Config.TAG, "connect");
+                        connectLocation();
+                    }
+
+                    @Override
+                    public void onConnectionSuspended(int i) {
+                        mGoogleApiClient.connect();
+                    }
+                })
+                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
+                    @Override
+                    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+                    }
+                })
+                .addApi(LocationServices.API)
+                .build();
 
         Util.requestPermissions(this, REQUEST_CODE_CAMERA_PERMISSION);
     }
+
+    private void connectLocation(){
+        LocationRequest locationRequest = new LocationRequest();
+        locationRequest.setInterval(3000);
+        locationRequest.setFastestInterval(0);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        /*
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .setNeedBle(true)
+                .addLocationRequest(mLocationRequest);
+        Task<LocationSettingsResponse> result = LocationServices.getSettingsClient(MainActivity.this).checkLocationSettings(builder.build());
+            result.addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
+                @Override
+                public void onComplete(@NonNull Task<LocationSettingsResponse> task) {
+                    task.getResult();
+                    try {
+                        LocationSettingsResponse response = task.getResult(ApiException.class);
+                    } catch (ApiException exception) {
+                        switch (exception.getStatusCode()) {
+                            case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                                try {
+                                    ResolvableApiException resolvable = (ResolvableApiException) exception;
+                                    resolvable.startResolutionForResult(MainActivity.this, REQUEST_CHECK_LOCATION_PERMISSION);
+                                } catch (IntentSender.SendIntentException e) {
+                                    e.printStackTrace();
+                                } catch (ClassCastException e) {
+                                    e.printStackTrace();
+                                }
+                                break;
+                            case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                                break;
+                        }
+                    }
+                }
+            });
+        */
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(MainActivity.this);
+        if(mStreetViewPanorama != null){
+            Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+            if(location != null){
+                mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+            }
+        }
+        mFusedLocationClient.requestLocationUpdates(locationRequest, mLocationCallback, Looper.myLooper());
+    }
+
+    private void stopLocation(){
+        if(mFusedLocationClient != null){
+            mFusedLocationClient.removeLocationUpdates(mLocationCallback);
+        }
+    }
+
+    private LocationCallback mLocationCallback = new LocationCallback() {
+        @Override
+        public void onLocationResult(LocationResult locationResult) {
+            super.onLocationResult(locationResult);
+            Log.d(Config.TAG, "lat:" + locationResult.getLastLocation().getLatitude() + "lon:" + locationResult.getLastLocation().getLongitude());
+            if(mStreetViewPanorama != null){
+                Location location = locationResult.getLastLocation();
+                mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+                /*
+                        if(mLatLocation == null || mLatLocation.first != location.getLatitude() || mLatLocation.second != location.getLongitude()){
+                            mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+                            mLatLocation = new Pair<Double, Double>(location.getLatitude(), location.getLongitude());
+                        }
+                */
+            }
+        }
+    };
 
     private void startTakePictureThread(){
         if(mCamera != null){
@@ -129,7 +243,7 @@ public class MainActivity extends Activity {
         if (requestCode != REQUEST_CODE_CAMERA_PERMISSION)
             return;
         if(!Util.existConfirmPermissions(this)){
-            setupMobileVisionCamera();
+            connectLocation();
             startCamera(mHolder);
         }
     }
@@ -137,17 +251,20 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        mStreetViewPanoramaView.onResume();
+        mGoogleApiClient.connect();
         if(!Util.existConfirmPermissions(this)){
-            setupMobileVisionCamera();
             startCamera(mHolder);
         }
-        mStreetViewPanoramaView.onResume();
+
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopCamera();
+        stopLocation();
+        mGoogleApiClient.disconnect();
         mStreetViewPanoramaView.onPause();
     }
 
@@ -159,21 +276,26 @@ public class MainActivity extends Activity {
     }
 
     private void startCamera(SurfaceHolder holder){
-        if(mCamera != null) {
-            mCamera.start(holder);
+        if(mCamera == null){
+            mCamera = new CameraWrapper();
         }
+        mCamera.start(holder);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mStreetViewPanoramaView.onDestroy();
-    }
-
-    private void setupMobileVisionCamera() {
-        if(mCamera == null){
-            mCamera = new CameraWrapper();
-        }
     }
 
     private SurfaceHolder generateSurfaceHolder(){
