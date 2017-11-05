@@ -19,6 +19,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.os.Build;
 import android.util.Log;
 import android.view.Display;
+import android.view.View;
 import android.webkit.WebView;
 import android.widget.ImageView;
 
@@ -26,6 +27,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 
 public class Util {
@@ -203,5 +206,30 @@ public class Util {
 		Matrix matrix = new Matrix();
 		matrix.preScale(-1, 1);
 		return Bitmap.createBitmap(orgImage, 0, 0, orgImage.getWidth(), orgImage.getHeight(), matrix, false);
+	}
+
+	public static Bitmap getViewCapture(View view) {
+		view.setDrawingCacheEnabled(true);
+
+		// Viewのキャッシュを取得
+		Bitmap cache = view.getDrawingCache();
+		Bitmap screenShot = Bitmap.createBitmap(cache);
+		view.setDrawingCacheEnabled(false);
+		return screenShot;
+	}
+
+	public static Bitmap getBitmapFromURL(String urlString) {
+		try {
+			URL url = new URL(urlString);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setDoInput(true);
+			connection.connect();
+			InputStream input = connection.getInputStream();
+			Bitmap myBitmap = BitmapFactory.decodeStream(input);
+			return myBitmap;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }

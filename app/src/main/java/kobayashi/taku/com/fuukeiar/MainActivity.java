@@ -1,9 +1,17 @@
 package kobayashi.taku.com.fuukeiar;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -23,6 +31,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 
+import com.bumptech.glide.Glide;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -38,6 +47,7 @@ import com.google.android.gms.location.LocationSettingsStates;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.maps.OnStreetViewPanoramaReadyCallback;
 import com.google.android.gms.maps.StreetViewPanorama;
+import com.google.android.gms.maps.StreetViewPanoramaView;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.StreetViewPanoramaLocation;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -68,6 +78,10 @@ public class MainActivity extends Activity {
     private GoogleApiClient mGoogleApiClient;
     private FusedLocationProviderClient mFusedLocationClient;
     private Pair<Double, Double> mLatLocation = null;
+
+    private SensorManager mSensorManager;
+    private float[] mAccekerometer = new float[3];
+    private float[] mGeomagnetic = new float[3];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,6 +156,7 @@ public class MainActivity extends Activity {
                 .addApi(LocationServices.API)
                 .build();
 
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         Util.requestPermissions(this, REQUEST_CODE_CAMERA_PERMISSION);
     }
 
@@ -217,17 +232,24 @@ public class MainActivity extends Activity {
         }
     };
 
+    private StreetViewPanoramaLocation mLocation;
+
     private void startTakePictureThread(){
         if(mCamera != null){
+            mLocation = mStreetViewPanorama.getLocation();
             Thread savePictureThread = new Thread(new Runnable() {
                 private String mSaveImagePath;
 
                 @Override
                 public void run() {
                     Bitmap takeImage = mCamera.takePreviewPicture();
+                    Bitmap panorama = Util.getBitmapFromURL("https://maps.googleapis.com/maps/api/streetview?size=640x640&location=" + mLocation.position.latitude + "," + mLocation.position.longitude + "&key=" + getString(R.string.google_maps_key));
+                    Bitmap saveImage = compositeImages(takeImage, panorama);
+                    takeImage.recycle();
+                    panorama.recycle();
                     if(takeImage != null){
                         mSaveImagePath = ExternalStorageManager.getFilePath(".png");
-                        boolean saveSuccess = ExternalStorageManager.saveImage(MainActivity.this, takeImage, mSaveImagePath);
+                        boolean saveSuccess = ExternalStorageManager.saveImage(MainActivity.this, saveImage, mSaveImagePath);
                         if(saveSuccess){
                             mCallMainThreadHandler.post(new Runnable() {
                                 @Override
@@ -263,6 +285,36 @@ public class MainActivity extends Activity {
         }
     }
 
+    private Bitmap compositeImages(Bitmap picture, Bitmap capture){
+        int maxHeight = Math.max(capture.getHeight(), picture.getHeight());
+        int pictureWidth = picture.getWidth() * maxHeight / picture.getHeight();
+        int captureWidth = capture.getWidth() * maxHeight / capture.getHeight();
+
+        Bitmap compositeImage = Bitmap.createBitmap(captureWidth + pictureWidth, maxHeight, Bitmap.Config.ARGB_8888);
+        Bitmap copyImage = compositeImage.copy(Bitmap.Config.ARGB_8888, true);
+        compositeImage.recycle();
+        compositeImage = null;
+        compositeImage = copyImage;
+        Canvas bitmapCanvas = new Canvas(compositeImage);
+        Paint paint = new Paint();
+        bitmapCanvas.drawBitmap(picture, new Rect(0,0,picture.getWidth(),picture.getHeight()), new Rect(0,0,pictureWidth,maxHeight), paint);
+        bitmapCanvas.drawBitmap(capture, new Rect(0,0,capture.getWidth(),capture.getHeight()), new Rect(pictureWidth,0,pictureWidth + captureWidth,maxHeight), paint);
+        return compositeImage;
+    }
+
+    private SensorEventListener mSensorEventListener = new SensorEventListener(){
+
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+        }
+    };
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -274,6 +326,8 @@ public class MainActivity extends Activity {
             mIsResume = true;
             mStreetViewPanoramaView.onResume();
         }
+        mSensorManager.registerListener(mSensorEventListener, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_UI);
+        mSensorManager.registerListener(mSensorEventListener, mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_UI);
     }
 
     @Override
@@ -284,6 +338,7 @@ public class MainActivity extends Activity {
         mGoogleApiClient.disconnect();
         mIsResume = false;
         mStreetViewPanoramaView.onPause();
+        mSensorManager.unregisterListener(mSensorEventListener);
     }
 
     private void stopCamera(){
