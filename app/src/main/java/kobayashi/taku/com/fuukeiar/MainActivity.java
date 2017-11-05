@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Bitmap;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -37,8 +39,12 @@ import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.maps.OnStreetViewPanoramaReadyCallback;
 import com.google.android.gms.maps.StreetViewPanorama;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.StreetViewPanoramaLocation;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+
+import java.io.IOException;
+import java.util.List;
 
 public class MainActivity extends Activity {
 
@@ -57,6 +63,7 @@ public class MainActivity extends Activity {
 
     private ExtendStreetViewPanoramaView mStreetViewPanoramaView;
     private StreetViewPanorama mStreetViewPanorama;
+    private boolean mIsResume = false;
 
     private GoogleApiClient mGoogleApiClient;
     private FusedLocationProviderClient mFusedLocationClient;
@@ -95,15 +102,18 @@ public class MainActivity extends Activity {
             public void onStreetViewPanoramaReady(StreetViewPanorama streetViewPanorama) {
                 mStreetViewPanorama = streetViewPanorama;
                 mStreetViewPanorama.setStreetNamesEnabled(true);
-                mStreetViewPanorama.setUserNavigationEnabled(true);
-                mStreetViewPanorama.setZoomGesturesEnabled(true);
-                mStreetViewPanorama.setPanningGesturesEnabled(true);
+                mStreetViewPanorama.setUserNavigationEnabled(false);
+                mStreetViewPanorama.setZoomGesturesEnabled(false);
+                mStreetViewPanorama.setPanningGesturesEnabled(false);
+                mStreetViewPanorama.setOnStreetViewPanoramaChangeListener(new StreetViewPanorama.OnStreetViewPanoramaChangeListener() {
+                    @Override
+                    public void onStreetViewPanoramaChange(StreetViewPanoramaLocation streetViewPanoramaLocation) {
+                        Log.d(Config.TAG, "pc lat:" + streetViewPanoramaLocation.position.latitude + " lon:" + streetViewPanoramaLocation.position.longitude + " " + streetViewPanoramaLocation.links);
+                    }
+                });
                 if(mFusedLocationClient != null){
                     // 最後の位置情報取得
-                    Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-                    if(location != null){
-                        mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
-                    }
+                    showNearStreetView(LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient));
                 }
             }
         });
@@ -112,7 +122,9 @@ public class MainActivity extends Activity {
                 .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
                     @Override
                     public void onConnected(@Nullable Bundle bundle) {
-                        Log.d(Config.TAG, "connect");
+                        if(!mIsResume){
+                            mStreetViewPanoramaView.onResume();
+                        }
                         connectLocation();
                     }
 
@@ -131,6 +143,13 @@ public class MainActivity extends Activity {
                 .build();
 
         Util.requestPermissions(this, REQUEST_CODE_CAMERA_PERMISSION);
+    }
+
+    private void showNearStreetView(Location location){
+        if(location != null){
+            // 第二引数は探し出す一番近くの場所半径メートル
+            mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()), 1000);
+        }
     }
 
     private void connectLocation(){
@@ -170,10 +189,7 @@ public class MainActivity extends Activity {
         */
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(MainActivity.this);
         if(mStreetViewPanorama != null){
-            Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            if(location != null){
-                mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
-            }
+            showNearStreetView(LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient));
         }
         mFusedLocationClient.requestLocationUpdates(locationRequest, mLocationCallback, Looper.myLooper());
     }
@@ -190,8 +206,7 @@ public class MainActivity extends Activity {
             super.onLocationResult(locationResult);
             Log.d(Config.TAG, "lat:" + locationResult.getLastLocation().getLatitude() + "lon:" + locationResult.getLastLocation().getLongitude());
             if(mStreetViewPanorama != null){
-                Location location = locationResult.getLastLocation();
-                mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+                showNearStreetView(locationResult.getLastLocation());
                 /*
                         if(mLatLocation == null || mLatLocation.first != location.getLatitude() || mLatLocation.second != location.getLongitude()){
                             mStreetViewPanorama.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
@@ -251,12 +266,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        mStreetViewPanoramaView.onResume();
         mGoogleApiClient.connect();
         if(!Util.existConfirmPermissions(this)){
             startCamera(mHolder);
         }
-
+        if(mGoogleApiClient.isConnected()){
+            mIsResume = true;
+            mStreetViewPanoramaView.onResume();
+        }
     }
 
     @Override
@@ -265,6 +282,7 @@ public class MainActivity extends Activity {
         stopCamera();
         stopLocation();
         mGoogleApiClient.disconnect();
+        mIsResume = false;
         mStreetViewPanoramaView.onPause();
     }
 
