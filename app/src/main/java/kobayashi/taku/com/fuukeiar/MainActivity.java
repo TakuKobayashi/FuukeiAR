@@ -118,9 +118,9 @@ public class MainActivity extends Activity {
             public void onStreetViewPanoramaReady(StreetViewPanorama streetViewPanorama) {
                 mStreetViewPanorama = streetViewPanorama;
                 mStreetViewPanorama.setStreetNamesEnabled(true);
-                mStreetViewPanorama.setUserNavigationEnabled(false);
+                mStreetViewPanorama.setUserNavigationEnabled(true);
                 mStreetViewPanorama.setZoomGesturesEnabled(false);
-                mStreetViewPanorama.setPanningGesturesEnabled(false);
+                mStreetViewPanorama.setPanningGesturesEnabled(true);
                 mStreetViewPanorama.setOnStreetViewPanoramaChangeListener(new StreetViewPanorama.OnStreetViewPanoramaChangeListener() {
                     @Override
                     public void onStreetViewPanoramaChange(StreetViewPanoramaLocation streetViewPanoramaLocation) {
